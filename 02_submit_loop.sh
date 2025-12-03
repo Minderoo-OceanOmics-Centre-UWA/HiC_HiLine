@@ -22,5 +22,5 @@ for sample in "${samples[@]}"; do
     set -- $sample
     sample_dir=$1
     OG=$2
-    sbatch run_hiline.sh "$run_dir" "$sample_dir" "$OG"
+    sbatch 03_run_hiline.sh "$run_dir" "$sample_dir" "$OG" --clean
 done
