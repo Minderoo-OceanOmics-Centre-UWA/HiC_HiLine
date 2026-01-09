@@ -2,13 +2,13 @@
 
 This page explains how to run the HiLine tool to analyse the quality of the HiC data for scaffolding reference genome assemblies.
 
-**Step 1.** Run the 01_download.sh script, pass in the RUNID and RUNDIR as arguments. 
+**Step 1.** Run the 01_download_hic_data.sh script, pass in the RUNID and RUNDIR as arguments. 
 
 **example**
 ```
-bash 01_download.sh "NEXT_251118_AD" "/scratch/pawsey0964/lhuet/hic-analysis"
+bash 01_download_hic_data.sh "NEXT_251118_AD" "/scratch/pawsey0964/lhuet/hic-analysis"
 ```
-**Step 2.** Stage the assembly files, create a list of OG numbers you are running the complexity anlysis for and call it OG-list.sh. Then run the 02_get_primary_assemblies.sh script. Pass in the download path. 
+**Step 2.** Stage the assembly files, create a list of OG numbers you are running the complexity anlysis for and call it OG-list.txt. Then run the 02_get_primary_assemblies.sh script. Pass in the download path. 
 
 **example**
 ```

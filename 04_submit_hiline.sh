@@ -36,9 +36,6 @@ fi
 cd "${run_dir}/${sample_dir}"
 echo "Now in: $(pwd)"
 
-cd "${run_dir}/${sample_dir}"
-echo "Now in: $(pwd)"
-
 if [[ "$CLEAN" == "true" ]]; then
     echo "Cleaning old HiLine-generated files..."
 
@@ -70,24 +67,40 @@ if [[ "$CLEAN" == "true" ]]; then
     echo "Cleanup complete."
 fi
 
+# Define Hi-C files 
+mapfile -t R1S < <(ls -1 *R1_001.fastq.gz)
+mapfile -t R2S < <(ls -1 *R2_001.fastq.gz)
+[[ ${#R1S[@]} -eq 1 && ${#R2S[@]} -eq 1 ]] || { echo "Expected exactly 1 R1 and 1 R2 fastq.gz in $(pwd)"; exit 2; }
 
-#Define Hi-C files
-HICR1=$(echo *R1_001.fastq.gz)
-HICR2=$(echo *R2_001.fastq.gz)
+HICR1="${R1S[0]}"
+HICR2="${R2S[0]}"
 
 echo "Hi-C forward: $HICR1"
 echo "Hi-C reverse: $HICR2"
 
-hic_R1X=${sample}_R1_1x.fastq.gz
-hic_R2X=${sample}_R2_1x.fastq.gz
+# Use node-local temp if available
+TMPDIR="${SLURM_TMPDIR:-$(pwd)}"
+echo "TMPDIR: $TMPDIR"
 
-fasta=$(echo *p_ctg.fasta)
+# Decompress inputs to local disk (avoids BBTools BGZF/gzip MT issues)
+hic_R1_raw="$TMPDIR/${sample}.R1.fastq"
+hic_R2_raw="$TMPDIR/${sample}.R2.fastq"
 
-echo assembly: $fasta
+echo "Decompressing Hi-C reads to TMPDIR..."
+pigz -dc "$HICR1" > "$hic_R1_raw"
+pigz -dc "$HICR2" > "$hic_R2_raw"
+[[ -s "$hic_R1_raw" && -s "$hic_R2_raw" ]] || { echo "Decompression produced empty FASTQ(s)"; exit 3; }
 
+# 1X outputs (uncompressed)
+hic_R1X="$TMPDIR/${sample}_R1_1x.fastq"
+hic_R2X="$TMPDIR/${sample}_R2_1x.fastq"
+
+mapfile -t FASTAS < <(ls -1 *p_ctg.fasta 2>/dev/null || true)
+[[ ${#FASTAS[@]} -eq 1 ]] || { echo "Expected exactly 1 *p_ctg.fasta, found ${#FASTAS[@]}"; printf '%s\n' "${FASTAS[@]}"; exit 5; }
+fasta="${FASTAS[0]}"
+echo "assembly: $fasta"
 
 ## top 30 contigs
-
 
 #1 index the genome
 
@@ -109,18 +122,19 @@ awk '{sum+=$2} END {print "Total bp:", sum, " (~", sum/1e6, " Mb)"}' \
   ${sample}_30_largest_contigs.fasta.fai
 
 
-#skim reads to 1X 
+# skim reads to 1X 
 
-singularity run $SING2/bbtools:39.49.sif reformat.sh \
-  in1=$HICR1 \
-  in2=$HICR2 \
-  out1=$hic_R1X \
-  out2=$hic_R2X \
+# skim reads to 1X (from uncompressed inputs)
+singularity run "$SING2/bbtools:39.49.sif" reformat.sh \
+  in1="$hic_R1_raw" \
+  in2="$hic_R2_raw" \
+  out1="$hic_R1X" \
+  out2="$hic_R2X" \
   samplerate=0.1667 \
-  sampleseed=42
+  sampleseed=42 \
+  threads=1
 
-
-#align contigs with HiC reads and convert to cram file 
+# align contigs with HiC reads and convert to cram file 
 
 singularity run $SING/bwa:0.7.17.sif bwa index ${sample}_30_largest_contigs.fasta
 
